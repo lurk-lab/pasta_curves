@@ -5,7 +5,7 @@ use serde_crate::{
 };
 
 use crate::{
-    curves::{EpAffine, EqAffine},
+    curves::{EpAffine, EqAffine, Ep, Eq},
     fields::{Fp, Fq},
 };
 
@@ -98,6 +98,42 @@ impl<'de> Deserialize<'de> for EqAffine {
         let bytes = deserialize_bytes(d)?;
         match EqAffine::from_bytes(&bytes).into() {
             Some(eq_affine) => Ok(eq_affine),
+            None => Err(D::Error::custom(
+                "deserialized bytes don't encode a Vesta curve point",
+            )),
+        }
+    }
+}
+
+impl Serialize for Ep {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        serialize_bytes(self.to_bytes(), s)
+    }
+}
+
+impl<'de> Deserialize<'de> for Ep {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let bytes = deserialize_bytes(d)?;
+        match Ep::from_bytes(&bytes).into() {
+            Some(ep) => Ok(ep),
+            None => Err(D::Error::custom(
+                "deserialized bytes don't encode a Pallas curve point",
+            )),
+        }
+    }
+}
+
+impl Serialize for Eq {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        serialize_bytes(self.to_bytes(), s)
+    }
+}
+
+impl<'de> Deserialize<'de> for Eq {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let bytes = deserialize_bytes(d)?;
+        match Eq::from_bytes(&bytes).into() {
+            Some(eq) => Ok(eq),
             None => Err(D::Error::custom(
                 "deserialized bytes don't encode a Vesta curve point",
             )),
