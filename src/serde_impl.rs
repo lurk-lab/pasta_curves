@@ -5,7 +5,7 @@ use serde_crate::{
 };
 
 use crate::{
-    curves::{EpAffine, EqAffine, Ep, Eq},
+    curves::{Ep, EpAffine, Eq, EqAffine},
     fields::{Fp, Fq},
 };
 
@@ -156,9 +156,14 @@ mod tests {
 
     fn test_roundtrip<T: Serialize + for<'a> Deserialize<'a> + Debug + PartialEq>(t: &T) {
         let serialized_json = serde_json::to_vec(t).unwrap();
+        println!(
+            "My json: {:?}",
+            std::str::from_utf8(&serialized_json).unwrap()
+        );
         assert_eq!(*t, serde_json::from_slice(&serialized_json).unwrap());
 
         let serialized_bincode = bincode::serialize(t).unwrap();
+        println!("My bincode: {:?}", serialized_bincode);
         assert_eq!(*t, bincode::deserialize(&serialized_bincode).unwrap());
     }
 
@@ -261,6 +266,104 @@ mod tests {
     }
 
     #[test]
+    fn serde_ep() {
+        let mut rng = XorShiftRng::from_seed([
+            0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06,
+            0xbc, 0xe5,
+        ]);
+
+        for _ in 0..100 {
+            let f = Ep::random(&mut rng);
+            test_roundtrip(&f);
+        }
+
+        let f = Ep::identity();
+        test_roundtrip(&f);
+        assert_eq!(
+            serde_json::from_slice::<Ep>(
+                br#""0000000000000000000000000000000000000000000000000000000000000000""#
+            )
+            .unwrap(),
+            f
+        );
+        assert_eq!(
+            bincode::deserialize::<Ep>(&[
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0
+            ])
+            .unwrap(),
+            f
+        );
+
+        let f = Ep::generator();
+        test_roundtrip(&f);
+        assert_eq!(
+            serde_json::from_slice::<Ep>(
+                br#""00000000ed302d991bf94c09fc98462200000000000000000000000000000040""#
+            )
+            .unwrap(),
+            f
+        );
+        assert_eq!(
+            bincode::deserialize::<Ep>(&[
+                0, 0, 0, 0, 237, 48, 45, 153, 27, 249, 76, 9, 252, 152, 70, 34, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 64
+            ])
+            .unwrap(),
+            f
+        );
+    }
+
+    #[test]
+    fn serde_eq() {
+        let mut rng = XorShiftRng::from_seed([
+            0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06,
+            0xbc, 0xe5,
+        ]);
+
+        for _ in 0..100 {
+            let f = Eq::random(&mut rng);
+            test_roundtrip(&f);
+        }
+
+        let f = Eq::identity();
+        test_roundtrip(&f);
+        assert_eq!(
+            serde_json::from_slice::<Eq>(
+                br#""0000000000000000000000000000000000000000000000000000000000000000""#
+            )
+            .unwrap(),
+            f
+        );
+        assert_eq!(
+            bincode::deserialize::<Eq>(&[
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0
+            ])
+            .unwrap(),
+            f
+        );
+
+        let f = Eq::generator();
+        test_roundtrip(&f);
+        assert_eq!(
+            serde_json::from_slice::<Eq>(
+                br#""0000000021eb468cdda89409fc98462200000000000000000000000000000040""#
+            )
+            .unwrap(),
+            f
+        );
+        assert_eq!(
+            bincode::deserialize::<Eq>(&[
+                0, 0, 0, 0, 33, 235, 70, 140, 221, 168, 148, 9, 252, 152, 70, 34, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 64
+            ])
+            .unwrap(),
+            f
+        );
+    }
+
+    #[test]
     fn serde_ep_affine() {
         let mut rng = XorShiftRng::from_seed([
             0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06,
@@ -310,6 +413,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn serde_eq_affine() {
         let mut rng = XorShiftRng::from_seed([
             0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06,
