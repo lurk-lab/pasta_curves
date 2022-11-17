@@ -156,14 +156,9 @@ mod tests {
 
     fn test_roundtrip<T: Serialize + for<'a> Deserialize<'a> + Debug + PartialEq>(t: &T) {
         let serialized_json = serde_json::to_vec(t).unwrap();
-        println!(
-            "My json: {:?}",
-            std::str::from_utf8(&serialized_json).unwrap()
-        );
         assert_eq!(*t, serde_json::from_slice(&serialized_json).unwrap());
 
         let serialized_bincode = bincode::serialize(t).unwrap();
-        println!("My bincode: {:?}", serialized_bincode);
         assert_eq!(*t, bincode::deserialize(&serialized_bincode).unwrap());
     }
 
