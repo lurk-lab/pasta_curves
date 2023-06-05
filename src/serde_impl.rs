@@ -2,11 +2,16 @@ use core::fmt;
 use ff::PrimeField;
 use group::GroupEncoding;
 use serde_crate::{
-    de::Error as DeserializeError,
     de::{Error as DeserializeError, SeqAccess, Visitor},
     ser::SerializeTuple,
-    Deserialize, Deserialize, Deserializer, Deserializer, Serialize, Serialize, Serializer,
-    Serializer,
+    Deserialize, Deserializer, Serialize, Serializer,
+};
+
+use crate::{
+    curves::{Ep, EpAffine, Eq, EqAffine},
+    fields::{Fp, Fq},
+    group::Curve,
+    EpUncompressed, EqUncompressed,
 };
 
 /// Serializes bytes to human readable or compact representation.
@@ -171,7 +176,7 @@ impl<'de> Deserialize<'de> for EpUncompressed {
         let array = if d.is_human_readable() {
             hex::serde::deserialize(d)?
         } else {
-            let visitor = ArrayVisitor {};
+            let visitor = ByteArrayVisitor {};
             d.deserialize_tuple(64, visitor)?
         };
         Ok(Self(array))
@@ -183,7 +188,11 @@ impl Serialize for EqUncompressed {
         if s.is_human_readable() {
             hex::serde::serialize(self.0, s)
         } else {
-            serde_bytes::serialize(self.as_ref(), s)
+            let mut seq = s.serialize_tuple(64)?;
+            for elem in self.0 {
+                seq.serialize_element(&elem)?;
+            }
+            seq.end()
         }
     }
 }
@@ -193,7 +202,7 @@ impl<'de> Deserialize<'de> for EqUncompressed {
         let array = if d.is_human_readable() {
             hex::serde::deserialize(d)?
         } else {
-            let visitor = ArrayVisitor {};
+            let visitor = ByteArrayVisitor {};
             d.deserialize_tuple(64, visitor)?
         };
         Ok(Self(array))
@@ -540,7 +549,7 @@ mod tests {
             bincode::deserialize::<EpUncompressed>(&[
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64
+                0, 0, 0, 0, 0, 0, 0, 64
             ])
             .unwrap(),
             f
@@ -591,7 +600,7 @@ mod tests {
             bincode::deserialize::<EqUncompressed>(&[
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64
+                0, 0, 0, 0, 0, 0, 0, 64
             ])
             .unwrap(),
             f
