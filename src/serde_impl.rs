@@ -1,14 +1,12 @@
+use core::fmt;
 use ff::PrimeField;
 use group::GroupEncoding;
 use serde_crate::{
-    de::Error as DeserializeError, Deserialize, Deserializer, Serialize, Serializer,
-};
-
-use crate::{
-    curves::{Ep, EpAffine, Eq, EqAffine},
-    fields::{Fp, Fq},
-    group::Curve,
-    EpUncompressed, EqUncompressed,
+    de::Error as DeserializeError,
+    de::{Error as DeserializeError, SeqAccess, Visitor},
+    ser::SerializeTuple,
+    Deserialize, Deserialize, Deserializer, Deserializer, Serialize, Serialize, Serializer,
+    Serializer,
 };
 
 /// Serializes bytes to human readable or compact representation.
@@ -131,12 +129,39 @@ impl<'de> Deserialize<'de> for Eq {
     }
 }
 
+struct ByteArrayVisitor {}
+
+impl<'de> Visitor<'de> for ByteArrayVisitor {
+    type Value = [u8; 64];
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str(concat!("an array of length ", 64))
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<[u8; 64], A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut arr = [u8::default(); 64];
+        for i in 0..64 {
+            arr[i] = seq
+                .next_element()?
+                .ok_or_else(|| DeserializeError::invalid_length(i, &self))?;
+        }
+        Ok(arr)
+    }
+}
+
 impl Serialize for EpUncompressed {
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         if s.is_human_readable() {
             hex::serde::serialize(self.0, s)
         } else {
-            serde_bytes::serialize(self.as_ref(), s)
+            let mut seq = s.serialize_tuple(64)?;
+            for elem in self.0 {
+                seq.serialize_element(&elem)?;
+            }
+            seq.end()
         }
     }
 }
@@ -146,11 +171,8 @@ impl<'de> Deserialize<'de> for EpUncompressed {
         let array = if d.is_human_readable() {
             hex::serde::deserialize(d)?
         } else {
-            let slice: &[u8] = serde_bytes::deserialize(d)?;
-            let array: [u8; 64] = slice
-                .try_into()
-                .map_err(|_| D::Error::invalid_length(slice.len(), &"[u8; 64]"))?;
-            array
+            let visitor = ArrayVisitor {};
+            d.deserialize_tuple(64, visitor)?
         };
         Ok(Self(array))
     }
@@ -171,11 +193,8 @@ impl<'de> Deserialize<'de> for EqUncompressed {
         let array = if d.is_human_readable() {
             hex::serde::deserialize(d)?
         } else {
-            let slice: &[u8] = serde_bytes::deserialize(d)?;
-            let array: [u8; 64] = slice
-                .try_into()
-                .map_err(|_| D::Error::invalid_length(slice.len(), &"[u8; 64]"))?;
-            array
+            let visitor = ArrayVisitor {};
+            d.deserialize_tuple(64, visitor)?
         };
         Ok(Self(array))
     }
@@ -519,9 +538,9 @@ mod tests {
         );
         assert_eq!(
             bincode::deserialize::<EpUncompressed>(&[
-                64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64
             ])
             .unwrap(),
             f
@@ -538,9 +557,9 @@ mod tests {
         );
         assert_eq!(
             bincode::deserialize::<EpUncompressed>(&[
-                64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 237, 48, 45, 153, 27, 249, 76, 9, 252, 152,
-                70, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+                0, 0, 0, 0, 237, 48, 45, 153, 27, 249, 76, 9, 252, 152, 70, 34, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ])
             .unwrap(),
             f
@@ -570,9 +589,9 @@ mod tests {
         );
         assert_eq!(
             bincode::deserialize::<EqUncompressed>(&[
-                64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64
             ])
             .unwrap(),
             f
@@ -589,9 +608,9 @@ mod tests {
         );
         assert_eq!(
             bincode::deserialize::<EqUncompressed>(&[
-                64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 235, 70, 140, 221, 168, 148, 9, 252, 152,
-                70, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+                0, 0, 0, 0, 33, 235, 70, 140, 221, 168, 148, 9, 252, 152, 70, 34, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ])
             .unwrap(),
             f
